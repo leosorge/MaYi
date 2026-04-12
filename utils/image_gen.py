@@ -98,7 +98,6 @@ def query_image_model(prompt: str) -> bytes | None:
     }
     payload = {
         "inputs": prompt,
-        "parameters": {"wait_for_model": True},
     }
 
     try:
