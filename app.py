@@ -397,22 +397,29 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
             '<div class="field-label">Generazione ritratti pittorici (FLUX)</div>',
             unsafe_allow_html=True,
         )
+
+        # Chiave univoca per questo profilo nello session_state
+        ss_key = f"imgs_{key_suffix}"
+
         if st.button("🖼️ Genera le 3 immagini", key=f"img_{key_suffix}"):
             tipi   = ["frontale", "laterale", "corpo"]
-            labels = ["Ritratto frontale", "Profilo laterale", "Figura intera"]
-            imgs   = {}
-
-            # Genera le tre immagini in sequenza con spinner dedicato
-            for tipo, titolo in zip(tipi, labels):
+            labels_tipi = ["Ritratto frontale", "Profilo laterale", "Figura intera"]
+            imgs_generati = {}
+            for tipo, titolo in zip(tipi, labels_tipi):
                 prompt = genera_prompt_visuale(r, tipo=tipo)
                 with st.spinner(f"FLUX: {titolo}…"):
                     img_bytes = query_image_model(prompt)
-                imgs[tipo] = (titolo, prompt, img_bytes)
+                imgs_generati[tipo] = (titolo, prompt, img_bytes)
+            # Salva in session_state: sopravvive ai rerender successivi
+            st.session_state[ss_key] = imgs_generati
 
-            # Mostra le tre immagini affiancate
+        # Mostra le immagini se presenti in session_state (anche dopo il rerender)
+        if ss_key in st.session_state:
+            imgs_salvati = st.session_state[ss_key]
+            nome_base    = label.replace(" ", "_").lower()[:30]
             col_f, col_l, col_c = st.columns(3)
-            for col, tipo in zip([col_f, col_l, col_c], tipi):
-                titolo, prompt, img_bytes = imgs[tipo]
+            for col, tipo in zip([col_f, col_l, col_c], ["frontale", "laterale", "corpo"]):
+                titolo, prompt, img_bytes = imgs_salvati[tipo]
                 with col:
                     st.markdown(
                         f'<div class="field-label">{titolo}</div>',
@@ -424,7 +431,6 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                             f'<div class="img-prompt">{prompt}</div>',
                             unsafe_allow_html=True,
                         )
-                        nome_base = label.replace(" ", "_").lower()[:30]
                         st.download_button(
                             label=f"⬇ Scarica {titolo.lower()}",
                             data=img_bytes,
