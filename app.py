@@ -13,6 +13,10 @@ import os
 
 import streamlit as st
 
+# AGGIUNTA DA GEMINI PER LE IMMAGINI 1/2
+# Aggiungi questo insieme agli altri import in cima ad app.py
+from utils.image_gen import query_image_model, genera_prompt_visuale
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 from utils.mayi_engine import (
@@ -286,7 +290,7 @@ def _bar(pct: int, colore: str) -> str:
         f'</div>'
     )
 
-
+''' CODICE CLAUDE SOSTITUITO DA GEMINI 
 def render_card(label: str, r: dict, key_suffix: str = ""):
     """Mostra la card di un risultato Ma Yi."""
     if "errore" in r:
@@ -336,6 +340,143 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
         )
 
     st.markdown("---")
+    '''
+
+# CODICE AGGIUNTO DA GEMINI PER LE FUNZIONI IMMAGINI
+
+def render_card(label: str, r: dict, key_suffix: str = ""):
+    """Mostra la card di un risultato Ma Yi con generazione immagini."""
+    if "errore" in r:
+        st.error(f"**{label}** — {r['errore']}")
+        return
+
+    st.markdown(f'<div class="card">', unsafe_allow_html=True)
+
+    col_em, col_info = st.columns([1, 4])
+    with col_em:
+        st.markdown(f'<div class="card-emoji">{r["emoji"]}</div>', unsafe_allow_html=True)
+
+    with col_info:
+        st.markdown(
+            f'<div class="card-elemento">{r["elemento"]}</div>'
+            f'<div style="font-size:.85rem;color:rgba(44,24,16,.5)">'
+            f'{label} &nbsp;·&nbsp; {r["eta"]} anni'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+
+    # Caratteristiche fisiche
+    col_a, col_b = st.columns(2)
+    with col_a:
+        for campo, titolo in [("corpo", "Corpo"), ("volto", "Volto"), ("complexion", "Carnagione")]:
+            st.markdown(
+                f'<div class="field-label">{titolo}</div>'
+                f'<div class="field-value">{r[campo]}</div>',
+                unsafe_allow_html=True,
+            )
+    with col_b:
+        for campo, titolo in [("voce", "Voce"), ("movimenti", "Postura e movimenti")]:
+            st.markdown(
+                f'<div class="field-label">{titolo}</div>'
+                f'<div class="field-value">{r[campo]}</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            f'<div class="field-label">Zona attiva (età {r["eta"]})</div>'
+            f'<div class="field-value" style="color:var(--red);font-weight:600">'
+            f'{r["zona_eta"]}</div>'
+            f'<div style="font-size:.8rem;color:rgba(44,24,16,.5);margin-top:.15rem">'
+            f'{r["nota_eta"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+
+    # Fasce età (tabella) e Corrispondenza
+    col_tab, col_match = st.columns([3, 2])
+    with col_tab:
+        st.markdown('<div class="field-label">Fasce d\'età e zone del volto</div>', unsafe_allow_html=True)
+        righe = ""
+        for f in r["eta_focus_completo"]:
+            cls = "eta-active" if f["attuale"] else ""
+            marker = " ◀" if f["attuale"] else ""
+            righe += (f'<tr class="{cls}"><td>{f["range"]}</td><td>{f["zona"]}{marker}</td>'
+                     f'<td style="color:rgba(44,24,16,.55)">{f["nota"]}</td></tr>')
+        st.markdown(f'<table class="eta-table"><thead><tr><th>Età</th><th>Zona</th>'
+                   f'<th>Interpretazione</th></tr></thead><tbody>{righe}</tbody></table>', unsafe_allow_html=True)
+
+    with col_match:
+        if r["top3"]:
+            st.markdown('<div class="field-label">Corrispondenza elementi</div>', unsafe_allow_html=True)
+            max_val = r["top3"][0][1] if r["top3"] else 1
+            for elem, val in r["punteggi"].items():
+                if val == 0: continue
+                pct = int((val / max_val) * 100) if max_val > 0 else 0
+                colore = MA_YI_DATA[elem]["colore_elemento"]
+                emoji = MA_YI_DATA[elem]["emoji"]
+                st.markdown(f'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">'
+                           f'<span style="width:90px;font-size:.8rem">{emoji} {elem}</span>'
+                           f'<div style="flex:1">{_bar(pct, colore)}</div>'
+                           f'<span style="font-size:.7rem;color:rgba(44,24,16,.4);width:38px;text-align:right">{val}</span>'
+                           f'</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metodo-tag">matching: {r["metodo"]}</div>', unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True) # Fine della Card Visiva
+
+    # ── NUOVA SEZIONE: GENERAZIONE E DOWNLOAD IMMAGINI ────────────────────────
+    st.markdown("### 🎨 Rappresentazione Visiva")
+    
+    # Usiamo lo stato della sessione per mantenere le immagini se già generate
+    img_key = f"img_data_{key_suffix}"
+    if img_key not in st.session_state:
+        st.session_state[img_key] = None
+
+    if st.button(f"✨ Genera Visualizzazioni ☯", key=f"btn_gen_{key_suffix}"):
+        from utils.image_gen import query_image_model, genera_prompt_visuale
+        with st.spinner("L'IA sta dipingendo secondo i canoni Ma Yi..."):
+            tipi = ["frontale", "laterale", "corpo"]
+            generated = {}
+            for t in tipi:
+                p = genera_prompt_visuale(r, tipo=t)
+                data = query_image_model(p)
+                if data: generated[t] = data
+            st.session_state[img_key] = generated
+
+    # Se le immagini sono presenti in session_state, mostrale e abilita il download
+    if st.session_state[img_key]:
+        imgs = st.session_state[img_key]
+        c1, c2, c3 = st.columns(3)
+        for t, col in zip(["frontale", "laterale", "corpo"], [c1, c2, c3]):
+            if t in imgs:
+                col.image(imgs[t], caption=t.title(), use_column_width=True)
+        
+        # Tasto Download ZIP per le immagini
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            for t, d in imgs.items():
+                zf.writestr(f"{label}_{t}.png", d)
+        buf.seek(0)
+        st.download_button(
+            label="⬇ Scarica Immagini (.zip)",
+            data=buf,
+            file_name=f"immagini_{label}.zip",
+            mime="application/zip",
+            key=f"dl_zip_{key_suffix}"
+        )
+
+    # ── SEZIONE DOWNLOAD PROFILO TXT ──────────────────────────────────────────
+    st.markdown("---")
+    txt_content = profilo_to_txt(label, r)
+    nome_f = label.replace(" ", "_").lower()[:40] + "-mayi.txt"
+    st.download_button(
+        label="⬇ Scarica profilo .txt",
+        data=txt_content.encode("utf-8"),
+        file_name=nome_f,
+        mime="text/plain",
+        key=f"dl_txt_{key_suffix}",
+    )
 
     # Fasce età (tabella)
     col_tab, col_match = st.columns([3, 2])
