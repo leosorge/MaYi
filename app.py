@@ -15,18 +15,18 @@ import streamlit as st
 import spacy
 import subprocess
 
-# Funzione per caricare il modello spaCy in modo sicuro
+# Caricamento del modello (il modello viene installato dal requirements.txt)
 @st.cache_resource
 def load_spacy_model():
-    model_name = "it_core_news_md"
     try:
-        return spacy.load(model_name)
+        return spacy.load("it_core_news_md")
     except OSError:
-        # Se il modello non c'è, lo scarichiamo al volo
-        subprocess.run(["python", "-m", "spacy", "download", model_name])
-        return spacy.load(model_name)
+        # Questo serve solo come paracadute estremo
+        import subprocess
+        import sys
+        subprocess.run([sys.executable, "-m", "spacy", "download", "it_core_news_md"])
+        return spacy.load("it_core_news_md")
 
-# Carica il modello (sostituisci dove facevi nlp = spacy.load...)
 nlp = load_spacy_model()
 
 # AGGIUNTA DA GEMINI PER LE IMMAGINI 1/2
