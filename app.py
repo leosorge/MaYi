@@ -419,7 +419,7 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                                 unsafe_allow_html=True,
                             )
                             if img_bytes:
-                                st.image(img_bytes, use_container_width=True)
+                                st.image(img_bytes, width='stretch')
                                 st.markdown(
                                     f'<div class="img-prompt">{prompt}</div>',
                                     unsafe_allow_html=True,
