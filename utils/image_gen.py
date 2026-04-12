@@ -12,7 +12,7 @@ API_TOKEN = st.secrets["HF_TOKEN"]
 
 # Modello consigliato per uno stile artistico coerente con la tradizione cinese
 # Puoi cambiare questo URL con altri modelli (es. FLUX.1 o SD-XL)
-API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
 
 def query_image_model(prompt: str) -> bytes:
     """
