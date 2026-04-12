@@ -22,7 +22,7 @@ from utils.mayi_engine import (
     spacy_model_name,
     _load_spacy,
 )
-from utils.image_gen import genera_prompt_visuale, query_image_model
+from utils.image_gen import genera_prompt_visuale, genera_didascalia, query_image_model
 from data.ma_yi_data import MA_YI_DATA, ETA_FOCUS
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
@@ -228,11 +228,12 @@ html, body, [data-testid="stApp"] {
 }
 
 .img-prompt {
-    font-size: .72rem;
-    font-style: italic;
-    color: rgba(44,24,16,.4);
-    margin-top: .4rem;
-    line-height: 1.5;
+    font-size: .92rem;
+    font-weight: 500;
+    color: rgba(44,24,16,.7);
+    margin-top: .5rem;
+    margin-bottom: .3rem;
+    line-height: 1.4;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -420,8 +421,9 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                             )
                             if img_bytes:
                                 st.image(img_bytes, width='stretch')
+                                didascalia = genera_didascalia(r, tipo)
                                 st.markdown(
-                                    f'<div class="img-prompt">{prompt}</div>',
+                                    f'<div class="img-prompt">{didascalia}</div>',
                                     unsafe_allow_html=True,
                                 )
                                 b64   = base64.b64encode(img_bytes).decode()
