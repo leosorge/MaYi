@@ -1,7 +1,6 @@
 """
 app.py — Streamlit app principale
 Analisi fisiognomica Ma Yi (麻衣神相)
-─────────────────────────────────────────────────────────────────────────────
 """
 
 from __future__ import annotations
@@ -12,27 +11,8 @@ import sys
 import os
 
 import streamlit as st
-import spacy
-import subprocess
 
-# Caricamento del modello (il modello viene installato dal requirements.txt)
-@st.cache_resource
-def load_spacy_model():
-    try:
-        return spacy.load("it_core_news_md")
-    except OSError:
-        # Questo serve solo come paracadute estremo
-        import subprocess
-        import sys
-        subprocess.run([sys.executable, "-m", "spacy", "download", "it_core_news_md"])
-        return spacy.load("it_core_news_md")
-
-nlp = load_spacy_model()
-
-# AGGIUNTA DA GEMINI PER LE IMMAGINI 1/2
-# Aggiungi questo insieme agli altri import in cima ad app.py
-from utils.image_gen import query_image_model, genera_prompt_visuale
-
+# sys.path prima di qualsiasi import locale
 sys.path.insert(0, os.path.dirname(__file__))
 
 from utils.mayi_engine import (
@@ -42,6 +22,7 @@ from utils.mayi_engine import (
     spacy_model_name,
     _load_spacy,
 )
+from utils.image_gen import genera_prompt_visuale, query_image_model
 from data.ma_yi_data import MA_YI_DATA, ETA_FOCUS
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
@@ -77,7 +58,6 @@ html, body, [data-testid="stApp"] {
     font-family: 'Noto Sans', serif;
 }
 
-/* Texture sfondo pergamena */
 [data-testid="stApp"]::before {
     content: "";
     position: fixed; inset: 0;
@@ -93,7 +73,6 @@ html, body, [data-testid="stApp"] {
     z-index: 0;
 }
 
-/* ── Hero ── */
 .hero {
     text-align: center;
     padding: 2.8rem 1rem 1.4rem;
@@ -117,7 +96,6 @@ html, body, [data-testid="stApp"] {
     margin-top: .5rem;
 }
 
-/* ── Tabs ── */
 [data-testid="stTabs"] button {
     font-family: 'Noto Serif SC', serif !important;
     font-size: .85rem !important;
@@ -129,7 +107,6 @@ html, body, [data-testid="stApp"] {
     border-bottom: 2px solid var(--red) !important;
 }
 
-/* ── Form ── */
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
 [data-testid="stTextArea"] textarea {
@@ -141,7 +118,6 @@ html, body, [data-testid="stApp"] {
 }
 [data-testid="stTextArea"] textarea { font-size: .9rem !important; }
 
-/* ── Pulsante primario ── */
 [data-testid="stButton"] > button[kind="primary"] {
     background: var(--red) !important;
     border: none !important;
@@ -156,7 +132,6 @@ html, body, [data-testid="stApp"] {
     background: var(--red-lt) !important;
 }
 
-/* ── Card risultato ── */
 .card {
     background: rgba(255,255,255,.65);
     border: 1px solid var(--border);
@@ -189,7 +164,6 @@ html, body, [data-testid="stApp"] {
     color: var(--brush);
 }
 
-/* ── Barre match ── */
 .bar-wrap {
     background: rgba(44,24,16,.09);
     border-radius: 2px;
@@ -202,7 +176,6 @@ html, body, [data-testid="stApp"] {
     background: linear-gradient(90deg, var(--red), var(--gold));
 }
 
-/* ── Tabella fasce età ── */
 .eta-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
 .eta-table th {
     text-align: left;
@@ -217,7 +190,6 @@ html, body, [data-testid="stApp"] {
 .eta-table td { padding: .35rem .5rem; border-bottom: 1px solid rgba(139,26,26,.07); }
 .eta-active { background: rgba(139,26,26,.08); font-weight: 600; color: var(--red); }
 
-/* ── Badge metodo ── */
 .metodo-tag {
     display: inline-block;
     font-size: .68rem;
@@ -231,7 +203,6 @@ html, body, [data-testid="stApp"] {
     margin-top: .6rem;
 }
 
-/* ── Download ── */
 [data-testid="stDownloadButton"] button {
     background: transparent !important;
     border: 1px solid var(--border) !important;
@@ -245,7 +216,6 @@ html, body, [data-testid="stApp"] {
     background: rgba(139,26,26,.06) !important;
 }
 
-/* ── Info box formato ── */
 .formato-box {
     background: rgba(184,150,12,.07);
     border: 1px solid rgba(184,150,12,.25);
@@ -255,6 +225,14 @@ html, body, [data-testid="stApp"] {
     line-height: 1.7;
     color: rgba(44,24,16,.7);
     margin-bottom: 1rem;
+}
+
+.img-prompt {
+    font-size: .72rem;
+    font-style: italic;
+    color: rgba(44,24,16,.4);
+    margin-top: .4rem;
+    line-height: 1.5;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -268,11 +246,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── STATUS SPACY ──────────────────────────────────────────────────────────────
+# ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 @st.cache_resource
 def _init_spacy():
-    """Carica spaCy una sola volta e mette in cache."""
     ok = _load_spacy()
     return ok, spacy_model_name()
 
@@ -284,7 +261,7 @@ with st.sidebar:
         "Usa spaCy (similarità semantica)",
         value=spacy_loaded,
         disabled=not spacy_loaded,
-        help="Richiede it_core_news_md installato. Se non disponibile usa keyword matching.",
+        help="Richiede it_core_news_md. Se non disponibile usa keyword matching.",
     )
     if spacy_loaded:
         st.success(f"Modello: `{spacy_name}`")
@@ -292,12 +269,26 @@ with st.sidebar:
         st.warning("spaCy md/lg non trovato → keyword matching attivo")
 
     st.markdown("---")
+
+    st.markdown("### 🖼️ Generazione immagini")
+    genera_immagini = st.toggle(
+        "Genera ritratto con FLUX",
+        value=False,
+        help="Richiede HF_TOKEN nei Secrets. Genera un ritratto in stile pittura cinese.",
+    )
+    if genera_immagini:
+        if st.secrets.get("HF_TOKEN"):
+            st.success("HF_TOKEN trovato ✓")
+        else:
+            st.error("HF_TOKEN mancante in Secrets")
+
+    st.markdown("---")
     st.markdown("**Soglia similarità spaCy:** `0.62`")
     st.markdown("**Tie-breaking:** ordine canonico")
     st.markdown("**Elementi:** Metallo · Legno · Terra · Fuoco · Acqua")
 
 
-# ── HELPER: render card risultato ─────────────────────────────────────────────
+# ── HELPER: barra ─────────────────────────────────────────────────────────────
 
 def _bar(pct: int, colore: str) -> str:
     return (
@@ -306,32 +297,29 @@ def _bar(pct: int, colore: str) -> str:
         f'</div>'
     )
 
-# CODICE AGGIUNTO DA GEMINI PER LE FUNZIONI IMMAGINI
+
+# ── HELPER: render card ───────────────────────────────────────────────────────
 
 def render_card(label: str, r: dict, key_suffix: str = ""):
-    """Mostra la card di un risultato Ma Yi con generazione immagini."""
     if "errore" in r:
         st.error(f"**{label}** — {r['errore']}")
         return
 
-    st.markdown(f'<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
 
     col_em, col_info = st.columns([1, 4])
     with col_em:
         st.markdown(f'<div class="card-emoji">{r["emoji"]}</div>', unsafe_allow_html=True)
-
     with col_info:
         st.markdown(
             f'<div class="card-elemento">{r["elemento"]}</div>'
             f'<div style="font-size:.85rem;color:rgba(44,24,16,.5)">'
-            f'{label} &nbsp;·&nbsp; {r["eta"]} anni'
-            f'</div>',
+            f'{label} &nbsp;·&nbsp; {r["eta"]} anni</div>',
             unsafe_allow_html=True,
         )
 
     st.markdown("---")
 
-    # Caratteristiche fisiche
     col_a, col_b = st.columns(2)
     with col_a:
         for campo, titolo in [("corpo", "Corpo"), ("volto", "Volto"), ("complexion", "Carnagione")]:
@@ -358,105 +346,17 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
 
     st.markdown("---")
 
-    # Fasce età (tabella) e Corrispondenza
     col_tab, col_match = st.columns([3, 2])
     with col_tab:
         st.markdown('<div class="field-label">Fasce d\'età e zone del volto</div>', unsafe_allow_html=True)
         righe = ""
         for f in r["eta_focus_completo"]:
-            cls = "eta-active" if f["attuale"] else ""
-            marker = " ◀" if f["attuale"] else ""
-            righe += (f'<tr class="{cls}"><td>{f["range"]}</td><td>{f["zona"]}{marker}</td>'
-                     f'<td style="color:rgba(44,24,16,.55)">{f["nota"]}</td></tr>')
-        st.markdown(f'<table class="eta-table"><thead><tr><th>Età</th><th>Zona</th>'
-                   f'<th>Interpretazione</th></tr></thead><tbody>{righe}</tbody></table>', unsafe_allow_html=True)
-
-    with col_match:
-        if r["top3"]:
-            st.markdown('<div class="field-label">Corrispondenza elementi</div>', unsafe_allow_html=True)
-            max_val = r["top3"][0][1] if r["top3"] else 1
-            for elem, val in r["punteggi"].items():
-                if val == 0: continue
-                pct = int((val / max_val) * 100) if max_val > 0 else 0
-                colore = MA_YI_DATA[elem]["colore_elemento"]
-                emoji = MA_YI_DATA[elem]["emoji"]
-                st.markdown(f'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">'
-                           f'<span style="width:90px;font-size:.8rem">{emoji} {elem}</span>'
-                           f'<div style="flex:1">{_bar(pct, colore)}</div>'
-                           f'<span style="font-size:.7rem;color:rgba(44,24,16,.4);width:38px;text-align:right">{val}</span>'
-                           f'</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="metodo-tag">matching: {r["metodo"]}</div>', unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True) # Fine della Card Visiva
-
-    # ── NUOVA SEZIONE: GENERAZIONE E DOWNLOAD IMMAGINI ────────────────────────
-    st.markdown("### 🎨 Rappresentazione Visiva")
-    
-    # Usiamo lo stato della sessione per mantenere le immagini se già generate
-    img_key = f"img_data_{key_suffix}"
-    if img_key not in st.session_state:
-        st.session_state[img_key] = None
-
-    if st.button(f"✨ Genera Visualizzazioni ☯", key=f"btn_gen_{key_suffix}"):
-        from utils.image_gen import query_image_model, genera_prompt_visuale
-        with st.spinner("L'IA sta dipingendo secondo i canoni Ma Yi..."):
-            tipi = ["frontale", "laterale", "corpo"]
-            generated = {}
-            for t in tipi:
-                p = genera_prompt_visuale(r, tipo=t)
-                data = query_image_model(p)
-                if data: generated[t] = data
-            st.session_state[img_key] = generated
-
-    # Se le immagini sono presenti in session_state, mostrale e abilita il download
-    if st.session_state[img_key]:
-        imgs = st.session_state[img_key]
-        c1, c2, c3 = st.columns(3)
-        for t, col in zip(["frontale", "laterale", "corpo"], [c1, c2, c3]):
-            if t in imgs:
-                col.image(imgs[t], caption=t.title(), use_column_width=True)
-        
-        # Tasto Download ZIP per le immagini
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as zf:
-            for t, d in imgs.items():
-                zf.writestr(f"{label}_{t}.png", d)
-        buf.seek(0)
-        st.download_button(
-            label="⬇ Scarica Immagini (.zip)",
-            data=buf,
-            file_name=f"immagini_{label}.zip",
-            mime="application/zip",
-            key=f"dl_zip_{key_suffix}"
-        )
-
-    # ── SEZIONE DOWNLOAD PROFILO TXT ──────────────────────────────────────────
-    st.markdown("---")
-    txt_content = profilo_to_txt(label, r)
-    nome_f = label.replace(" ", "_").lower()[:40] + "-mayi.txt"
-    st.download_button(
-        label="⬇ Scarica profilo .txt",
-        data=txt_content.encode("utf-8"),
-        file_name=nome_f,
-        mime="text/plain",
-        key=f"dl_txt_{key_suffix}",
-    )
-
-    # Fasce età (tabella)
-    col_tab, col_match = st.columns([3, 2])
-
-    with col_tab:
-        st.markdown('<div class="field-label">Fasce d\'età e zone del volto</div>', unsafe_allow_html=True)
-        righe = ""
-        for f in r["eta_focus_completo"]:
-            cls = "eta-active" if f["attuale"] else ""
+            cls    = "eta-active" if f["attuale"] else ""
             marker = " ◀" if f["attuale"] else ""
             righe += (
-                f'<tr class="{cls}">'
-                f'<td>{f["range"]}</td>'
+                f'<tr class="{cls}"><td>{f["range"]}</td>'
                 f'<td>{f["zona"]}{marker}</td>'
-                f'<td style="color:rgba(44,24,16,.55)">{f["nota"]}</td>'
-                f'</tr>'
+                f'<td style="color:rgba(44,24,16,.55)">{f["nota"]}</td></tr>'
             )
         st.markdown(
             f'<table class="eta-table"><thead><tr>'
@@ -472,9 +372,9 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
             for elem, val in r["punteggi"].items():
                 if val == 0:
                     continue
-                pct = int((val / max_val) * 100) if max_val > 0 else 0
+                pct    = int((val / max_val) * 100) if max_val > 0 else 0
                 colore = MA_YI_DATA[elem]["colore_elemento"]
-                emoji = MA_YI_DATA[elem]["emoji"]
+                emoji  = MA_YI_DATA[elem]["emoji"]
                 st.markdown(
                     f'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">'
                     f'<span style="width:90px;font-size:.8rem">{emoji} {elem}</span>'
@@ -483,7 +383,6 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-
         st.markdown(
             f'<div class="metodo-tag">matching: {r["metodo"]}</div>',
             unsafe_allow_html=True,
@@ -491,13 +390,32 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Download scheda singola
-    txt = profilo_to_txt(label, r)
-    nome_f = label.replace(" ", "_").lower()[:40] + "-mayi.txt"
+    # ── Immagine FLUX (opzionale) ─────────────────────────────────────────────
+    if genera_immagini:
+        st.markdown("---")
+        if st.button("🖼️ Genera ritratto pittorico", key=f"img_{key_suffix}"):
+            prompt = genera_prompt_visuale(r)
+            with st.spinner("FLUX sta dipingendo il ritratto…"):
+                img_bytes = query_image_model(prompt)
+            if img_bytes:
+                st.image(img_bytes, use_container_width=True)
+                st.markdown(
+                    f'<div class="img-prompt">Prompt: {prompt}</div>',
+                    unsafe_allow_html=True,
+                )
+                st.download_button(
+                    label="⬇ Scarica immagine",
+                    data=img_bytes,
+                    file_name=label.replace(" ", "_").lower()[:40] + "-mayi.png",
+                    mime="image/png",
+                    key=f"dl_img_{key_suffix}",
+                )
+
+    # Download .txt
     st.download_button(
         label="⬇ Scarica profilo .txt",
-        data=txt.encode("utf-8"),
-        file_name=nome_f,
+        data=profilo_to_txt(label, r).encode("utf-8"),
+        file_name=label.replace(" ", "_").lower()[:40] + "-mayi.txt",
         mime="text/plain",
         key=f"dl_{key_suffix}",
     )
@@ -507,9 +425,7 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
 
 tab_singolo, tab_multi = st.tabs(["☯  Analisi Singola", "☯  File Multi-Scheda"])
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 1 — INSERIMENTO SINGOLO
-# ════════════════════════════════════════════════════════════════════════════
+# TAB 1 ───────────────────────────────────────────────────────────────────────
 
 with tab_singolo:
     st.markdown("### Descrizione del soggetto")
@@ -530,13 +446,10 @@ with tab_singolo:
         height=160,
     )
 
-    analizza = st.button(
-        "☯  Analizza",
-        type="primary",
+    if st.button(
+        "☯  Analizza", type="primary",
         disabled=not (label_input.strip() and desc_input.strip()),
-    )
-
-    if analizza and label_input.strip() and desc_input.strip():
+    ):
         with st.spinner("Consultando i Cinque Elementi…"):
             risultato = analizza_descrizione(
                 testo=desc_input.strip(),
@@ -546,9 +459,7 @@ with tab_singolo:
         render_card(label_input.strip(), risultato, key_suffix="singolo")
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 2 — FILE MULTI-SCHEDA
-# ════════════════════════════════════════════════════════════════════════════
+# TAB 2 ───────────────────────────────────────────────────────────────────────
 
 with tab_multi:
     st.markdown("### Carica file multi-scheda")
@@ -556,11 +467,11 @@ with tab_multi:
     st.markdown("""
 <div class="formato-box">
 <strong>Formati supportati</strong><br>
-<strong>A) Delimitatore esplicito</strong> (consigliato) — blocchi separati da <code>==============================</code>:<br>
+<strong>A) Delimitatore esplicito</strong> (consigliato) — blocchi separati da
+<code>==============================</code>:<br>
 <code>Nome Personaggio<br>ETA: 38<br>Descrizione libera del carattere…</code><br><br>
-<strong>B) Doppia riga vuota</strong> — blocchi separati da due o più righe vuote (come il Colab originale):<br>
-<code>Nome Personaggio</code><br><code>ETA: 38</code><br><code>Descrizione…</code><br><br>
-La riga <code>ETA: N</code> è opzionale per scheda; se assente usa l'età predefinita sotto.
+<strong>B) Doppia riga vuota</strong> — blocchi separati da due o più righe vuote.<br>
+La riga <code>ETA: N</code> è opzionale; se assente usa l'età predefinita sotto.
 </div>
 """, unsafe_allow_html=True)
 
@@ -569,17 +480,15 @@ La riga <code>ETA: N</code> è opzionale per scheda; se assente usa l'età prede
         uploaded = st.file_uploader("Scegli file .txt", type=["txt"])
     with c_eta:
         eta_default = st.number_input(
-            "Età predefinita (se non specificata per scheda)",
-            min_value=1, max_value=120, value=45, step=1,
+            "Età predefinita", min_value=1, max_value=120, value=45, step=1,
         )
 
     if uploaded is not None:
         raw = uploaded.read().decode("utf-8")
         schede, errori = parse_file_multi(raw, eta_default=int(eta_default))
 
-        if errori:
-            for e in errori:
-                st.warning(e)
+        for e in errori:
+            st.warning(e)
 
         if not schede:
             st.error("Nessuna scheda valida trovata nel file.")
@@ -589,34 +498,32 @@ La riga <code>ETA: N</code> è opzionale per scheda; se assente usa l'età prede
 
             with st.spinner("Analisi in corso…"):
                 for label, testo, eta in schede:
-                    r = analizza_descrizione(testo, eta=eta, use_spacy=use_spacy)
-                    risultati.append((label, r))
+                    risultati.append((label, analizza_descrizione(testo, eta=eta, use_spacy=use_spacy)))
 
             for i, (label, r) in enumerate(risultati):
                 with st.expander(
-                    f"{MA_YI_DATA.get(r.get('elemento',''), {}).get('emoji','☯')}  "
+                    f"{MA_YI_DATA.get(r.get('elemento', ''), {}).get('emoji', '☯')}  "
                     f"{label}  ·  {r.get('elemento', '—')}  ·  età {r.get('eta', '—')}",
                     expanded=(i == 0),
                 ):
                     render_card(label, r, key_suffix=f"multi_{i}")
 
-            # ── Download bulk ────────────────────────────────────────────
             st.markdown("---")
             st.markdown("#### ⬇ Scarica tutti i profili")
 
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 for label, r in risultati:
-                    nome_f = label.replace(" ", "_").lower()[:40] + "-mayi.txt"
-                    zf.writestr(nome_f, profilo_to_txt(label, r))
+                    zf.writestr(
+                        label.replace(" ", "_").lower()[:40] + "-mayi.txt",
+                        profilo_to_txt(label, r),
+                    )
             zip_buf.seek(0)
-
-            testo_unico = "\n\n".join(profilo_to_txt(l, r) for l, r in risultati)
 
             col1, col2 = st.columns(2)
             with col1:
                 st.download_button(
-                    label="⬇ Download ZIP (un file per scheda)",
+                    label="⬇ Download ZIP",
                     data=zip_buf,
                     file_name="analisi_mayi.zip",
                     mime="application/zip",
@@ -625,7 +532,7 @@ La riga <code>ETA: N</code> è opzionale per scheda; se assente usa l'età prede
             with col2:
                 st.download_button(
                     label="⬇ Download .txt unico",
-                    data=testo_unico.encode("utf-8"),
+                    data="\n\n".join(profilo_to_txt(l, r) for l, r in risultati).encode("utf-8"),
                     file_name="tutti_mayi.txt",
                     mime="text/plain",
                     key="dl_txt_multi",
@@ -638,6 +545,6 @@ st.markdown("""
     border-top:1px solid rgba(139,26,26,.15);
     font-size:.7rem;letter-spacing:.15em;
     color:rgba(44,24,16,.25);text-transform:uppercase">
-    Ma Yi 麻衣神相 · Cinque Elementi · spaCy + Streamlit · uso creativo / narrativo
+    Ma Yi 麻衣神相 · Cinque Elementi · spaCy + Streamlit · FLUX.1 · uso creativo / narrativo
 </div>
 """, unsafe_allow_html=True)
