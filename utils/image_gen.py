@@ -1,146 +1,56 @@
-'''
-VERSIONE CON GENERAZIONE IMMAGINI CON SCHNELL
-
 import streamlit as st
 import requests
-import io
+import time
 
-# Recupera il token dai secrets di Streamlit
-API_TOKEN = st.secrets["HF_TOKEN"]
+# Recupera il token dai secrets
+API_TOKEN = st.secrets.get("HF_TOKEN")
 
-# Utilizziamo FLUX.1-schnell, un modello moderno e attivo
-API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+# Usiamo l'endpoint di SD 2.1, solitamente più stabile del 1.5 su HF
+API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
 
-def query_image_model(prompt: str) -> bytes:
-    """
-    Invia il prompt all'Inference API di Hugging Face.
-    FLUX non richiede il negative_prompt nell'API di base.
-    """
+def query_image_model(prompt):
+    if not API_TOKEN:
+        st.error("HF_TOKEN non trovato nei Secrets!")
+        return None
+
     headers = {"Authorization": f"Bearer {API_TOKEN}"}
     payload = {
         "inputs": prompt,
+        "parameters": {"wait_for_model": True}
     }
     
     try:
-        response = requests.post(API_URL, headers=headers, json=payload)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
         
-        # Gestione errore 503 (Modello in caricamento)
+        # Se il modello è in caricamento (503), aspettiamo una volta sola
         if response.status_code == 503:
-            st.warning("Il modello si sta caricando su Hugging Face. Riprova tra 30 secondi.")
+            with st.spinner("Il modello si sta svegliando... attendi 15 secondi"):
+                time.sleep(15)
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+
+        if response.status_code == 200:
+            return response.content
+        else:
+            st.error(f"Errore API ({response.status_code}): {response.text}")
             return None
             
-        response.raise_for_status()
-        return response.content
     except Exception as e:
-        st.error(f"Errore durante la generazione dell'immagine: {e}")
+        st.error(f"Errore di connessione: {e}")
         return None
 
-def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
-    """
-    Costruisce un prompt in inglese basato sui dati Ma Yi.
-    """
-    elemento = risultato.get('elemento', 'Metallo')
-    corpo = risultato.get('corpo', '')
-    volto = risultato.get('volto', '')
-    complexion = risultato.get('complexion', '')
-    movimenti = risultato.get('movimenti', '')
-
-    # Stile artistico: Pittura tradizionale cinese a inchiostro
-    base_style = (
-        "Ancient Chinese ink wash painting style, traditional aesthetic, "
-        "charcoal lines on aged rice paper, minimalist, subtle earth tones."
-    )
+def genera_prompt_visuale(risultato, tipo="frontale"):
+    """Costruisce il prompt partendo dai dati Ma Yi dell'engine."""
+    v = risultato.get('volto', 'human face')
+    c = risultato.get('complexion', 'natural')
+    b = risultato.get('corpo', 'person')
+    m = risultato.get('movimenti', 'standing')
     
-    traits = f"A person with {volto}, skin complexion: {complexion}."
+    # Stile: pittura a inchiostro per coerenza storica
+    stile = "Ancient Chinese ink wash painting, traditional aesthetic, charcoal lines on parchment."
     
     if tipo == "frontale":
-        return f"{base_style} Frontal portrait, close-up. {traits} Calm expression."
+        return f"{stile} Frontal portrait, close-up, {v}, {c} skin."
     elif tipo == "laterale":
-        return f"{base_style} Side profile view. Focus on the nose and jawline. {traits}"
-    elif tipo == "corpo":
-        return f"{base_style} Full body standing. {corpo}. Posture: {movimenti}. Traditional Hanfu clothes."
-    
-    return f"{base_style} Portrait of a person, {elemento} element."
-    
-'''
-
-# Generatore d'immagini 
-# Usa stable diffusion base
-# attraverso API huggingface
-
-import streamlit as st
-import requests
-import io
-
-# Recupera il token dai secrets di Streamlit
-# Assicurati di aver aggiunto HF_TOKEN = "il_tuo_token" nei Secrets della tua app
-API_TOKEN = st.secrets["HF_TOKEN"]
-
-# Modello consigliato per uno stile artistico coerente con la tradizione cinese
-# Puoi cambiare questo URL con altri modelli (es. FLUX.1 o SD-XL)
-# Modello ad altissima stabilità per API gratuite
-API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
-
-def query_image_model(prompt: str) -> bytes:
-    """
-    Invia il prompt all'Inference API di Hugging Face e restituisce i dati binari dell'immagine.
-    """
-    headers = {"Authorization": f"Bearer {API_TOKEN}"}
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "negative_prompt": "low quality, blurry, modern clothing, 3d render, photo, realistic, sunglasses",
-            "num_inference_steps": 30
-        }
-    }
-    
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.content
-    except Exception as e:
-        st.error(f"Errore durante la generazione dell'immagine: {e}")
-        return None
-
-def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
-    """
-    Costruisce un prompt in inglese ottimizzato per l'IA, traducendo le 
-    caratteristiche antropometriche Ma Yi in istruzioni visive.
-    """
-    elemento = risultato.get('elemento', 'Metallo')
-    corpo = risultato.get('corpo', '')
-    volto = risultato.get('volto', '')
-    complexion = risultato.get('complexion', '')
-    movimenti = risultato.get('movimenti', '')
-
-    # Stile artistico di base: pittura tradizionale a inchiostro cinese su pergamena
-    base_style = (
-        "Ancient Chinese ink wash painting style, Shan shui aesthetic, "
-        "traditional brush strokes, charcoal lines, textured rice paper background, "
-        "subtle earth tones, minimalist composition."
-    )
-    
-    # Dettagli fisici derivati dal database Ma Yi
-    physical_traits = f"A person with {volto}, {complexion} skin tone."
-    
-    if tipo == "frontale":
-        return (
-            f"{base_style} Symmetrical front portrait of a person. "
-            f"{physical_traits} Calm and dignified expression, frontal view."
-        )
-    
-    elif tipo == "laterale":
-        return (
-            f"{base_style} Lateral side profile view portrait. "
-            f"Focus on the structure of the nose and jawline. {physical_traits}"
-        )
-    
-    elif tipo == "corpo":
-        # Combina la descrizione del corpo e della postura
-        return (
-            f"{base_style} Full body standing shot. {corpo}. "
-            f"Posture and movement: {movimenti}. "
-            f"Wearing traditional Hanfu robes reflecting the {elemento} element style."
-        )
-    
-    return f"{base_style} Portrait of a person, {elemento} element."
+        return f"{stile} Side profile view, profile of the head, {v}."
+    else:
+        return f"{stile} Full body view, {b}, posture: {m}."
