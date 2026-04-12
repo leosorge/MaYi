@@ -6,7 +6,7 @@ import time
 API_TOKEN = st.secrets.get("HF_TOKEN")
 
 # Usiamo l'endpoint di SD 2.1, solitamente più stabile del 1.5 su HF
-API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+API_URL = "https://router.huggingface.co/models/stabilityai/stable-diffusion-2-1"
 
 def query_image_model(prompt):
     if not API_TOKEN:
