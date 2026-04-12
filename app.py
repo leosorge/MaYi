@@ -435,10 +435,17 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                             )
                             b64   = base64.b64encode(img_bytes).decode()
                             fname = f"{nome_base}-{tipo}.png"
-                            st.markdown(
-                                f'<a href="data:image/png;base64,{b64}" '                                f'download="{fname}" '                                f'style="display:inline-block;margin-top:.4rem;'                                f'font-size:.78rem;color:#8b1a1a;'                                f'border:1px solid rgba(139,26,26,.35);'                                f'border-radius:3px;padding:.25rem .8rem;'                                f'text-decoration:none;">'                                f'⬇ Scarica {titolo.lower()}</a>',
-                                unsafe_allow_html=True,
+                            link = (
+                                f'<a href="data:image/png;base64,{b64}"'
+                                f' download="{fname}"'
+                                f' style="display:inline-block;margin-top:.4rem;'
+                                f'font-size:.78rem;color:#8b1a1a;'
+                                f'border:1px solid rgba(139,26,26,.35);'
+                                f'border-radius:3px;padding:.25rem .8rem;'
+                                f'text-decoration:none;">'
+                                f'⬇ Scarica {titolo.lower()}</a>'
                             )
+                            st.markdown(link, unsafe_allow_html=True)
                             zf.writestr(fname, img_bytes)
                         else:
                             st.warning(f"{titolo}: generazione fallita.")
