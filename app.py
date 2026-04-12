@@ -398,11 +398,10 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
             unsafe_allow_html=True,
         )
 
-        # Chiave univoca per questo profilo nello session_state
         ss_key = f"imgs_{key_suffix}"
 
         if st.button("🖼️ Genera le 3 immagini", key=f"img_{key_suffix}"):
-            tipi   = ["frontale", "laterale", "corpo"]
+            tipi        = ["frontale", "laterale", "corpo"]
             labels_tipi = ["Ritratto frontale", "Profilo laterale", "Figura intera"]
             imgs_generati = {}
             for tipo, titolo in zip(tipi, labels_tipi):
@@ -410,36 +409,48 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                 with st.spinner(f"FLUX: {titolo}…"):
                     img_bytes = query_image_model(prompt)
                 imgs_generati[tipo] = (titolo, prompt, img_bytes)
-            # Salva in session_state: sopravvive ai rerender successivi
             st.session_state[ss_key] = imgs_generati
 
-        # Mostra le immagini se presenti in session_state (anche dopo il rerender)
         if ss_key in st.session_state:
+            import base64
             imgs_salvati = st.session_state[ss_key]
             nome_base    = label.replace(" ", "_").lower()[:30]
+
             col_f, col_l, col_c = st.columns(3)
-            for col, tipo in zip([col_f, col_l, col_c], ["frontale", "laterale", "corpo"]):
-                titolo, prompt, img_bytes = imgs_salvati[tipo]
-                with col:
-                    st.markdown(
-                        f'<div class="field-label">{titolo}</div>',
-                        unsafe_allow_html=True,
-                    )
-                    if img_bytes:
-                        st.image(img_bytes, use_container_width=True)
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for col, tipo in zip([col_f, col_l, col_c],
+                                     ["frontale", "laterale", "corpo"]):
+                    titolo, prompt, img_bytes = imgs_salvati[tipo]
+                    with col:
                         st.markdown(
-                            f'<div class="img-prompt">{prompt}</div>',
+                            f'<div class="field-label">{titolo}</div>',
                             unsafe_allow_html=True,
                         )
-                        st.download_button(
-                            label=f"⬇ Scarica {titolo.lower()}",
-                            data=img_bytes,
-                            file_name=f"{nome_base}-{tipo}.png",
-                            mime="image/png",
-                            key=f"dl_img_{key_suffix}_{tipo}",
-                        )
-                    else:
-                        st.warning(f"{titolo}: generazione fallita.")
+                        if img_bytes:
+                            st.image(img_bytes, use_container_width=True)
+                            st.markdown(
+                                f'<div class="img-prompt">{prompt}</div>',
+                                unsafe_allow_html=True,
+                            )
+                            b64   = base64.b64encode(img_bytes).decode()
+                            fname = f"{nome_base}-{tipo}.png"
+                            st.markdown(
+                                f'<a href="data:image/png;base64,{b64}" '                                f'download="{fname}" '                                f'style="display:inline-block;margin-top:.4rem;'                                f'font-size:.78rem;color:#8b1a1a;'                                f'border:1px solid rgba(139,26,26,.35);'                                f'border-radius:3px;padding:.25rem .8rem;'                                f'text-decoration:none;">'                                f'⬇ Scarica {titolo.lower()}</a>',
+                                unsafe_allow_html=True,
+                            )
+                            zf.writestr(fname, img_bytes)
+                        else:
+                            st.warning(f"{titolo}: generazione fallita.")
+
+            zip_buf.seek(0)
+            st.download_button(
+                label="⬇ Scarica tutte e 3 le immagini (.zip)",
+                data=zip_buf,
+                file_name=f"{nome_base}-ritratti.zip",
+                mime="application/zip",
+                key=f"dl_zip_img_{key_suffix}",
+            )
 
     # Download .txt
     st.download_button(
