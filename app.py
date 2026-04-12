@@ -379,7 +379,7 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
     # ── Tre immagini FLUX ────────────────────────────────────────────────────
     st.markdown("---")
     genera_immagini = st.toggle(
-        "🖼️ Genera ritratti pittorici (FLUX)",
+        "Genera ritratti pittorici (FLUX 🖼️)",
         value=False,
         key=f"toggle_img_{key_suffix}",
         help="Richiede HF_TOKEN nei Secrets di Streamlit.",
