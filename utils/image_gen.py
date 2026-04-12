@@ -2,8 +2,7 @@
 utils/image_gen.py
 ─────────────────────────────────────────────────────────────────────────────
 Generazione immagini via HuggingFace Router → FLUX.1-schnell.
-I prompt sono costruiti a partire dai dati reali della scheda Ma Yi,
-traducendo e normalizzando i campi italiani per FLUX.
+Stile: fotorealistico, neutro etnicamente, basato sui dati Ma Yi.
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -14,142 +13,133 @@ import time
 import requests
 import streamlit as st
 
-# ── Endpoint ──────────────────────────────────────────────────────────────────
-
 API_URL = (
     "https://router.huggingface.co/hf-inference/models/"
     "black-forest-labs/FLUX.1-schnell"
 )
 
-# ── Dizionari di traduzione dai valori Ma Yi ──────────────────────────────────
+# ── Traduzione dati Ma Yi per elemento ───────────────────────────────────────
 
-# Corpo per elemento
 _CORPO_EN: dict[str, str] = {
-    "Metallo":    "slender upright figure, medium height, large-boned with lean limbs, straight posture",
-    "Legno":      "slim tall figure, long slender fingers, delicate build",
-    "Terra":      "stocky compact figure, short neck, short fingers, heavyset",
-    "Fuoco":      "narrow shoulders, wide hips, small hands and feet, energetic stance",
-    "Acqua":      "round full figure, prominent belly, narrow shoulders, flat buttocks",
+    "Metallo": "slender upright figure, medium height, large-boned with lean limbs",
+    "Legno":   "slim tall figure, long slender fingers, delicate build",
+    "Terra":   "stocky compact figure, short neck, short fingers, heavyset",
+    "Fuoco":   "narrow shoulders, wider hips, small hands and feet",
+    "Acqua":   "round full figure, prominent belly, narrow shoulders",
 }
 
-# Volto per elemento
 _VOLTO_EN: dict[str, str] = {
-    "Metallo":    "square jaw, high arched eyebrows, deep-set eyes, straight nose, firm expression",
-    "Legno":      "long oval face, prominent forehead, thick lips, thoughtful expression",
-    "Terra":      "large round face, wide mouth, broad flat nose, serene expression",
-    "Fuoco":      "diamond-shaped face, bushy eyebrows, flared nostrils, intense gaze",
-    "Acqua":      "round soft face, large eyes, thick arched eyebrows, gentle expression",
+    "Metallo": "square jaw, high arched eyebrows, deep-set eyes, straight prominent nose",
+    "Legno":   "long oval face, prominent forehead, thick lips",
+    "Terra":   "large round face, wide mouth, broad flat nose",
+    "Fuoco":   "diamond-shaped face, bushy eyebrows, flared nostrils",
+    "Acqua":   "round soft face, large eyes, thick arched eyebrows",
 }
 
-# Carnagione per elemento
 _CARNAGIONE_EN: dict[str, str] = {
-    "Metallo":    "pale white complexion",
-    "Legno":      "greenish pale complexion",
-    "Terra":      "warm yellow ochre complexion",
-    "Fuoco":      "bronze reddish complexion",
-    "Acqua":      "dark olive complexion",
+    "Metallo": "fair pale skin",
+    "Legno":   "pale slightly greenish skin tone",
+    "Terra":   "warm olive yellow skin",
+    "Fuoco":   "bronzed reddish skin",
+    "Acqua":   "dark olive skin",
 }
 
-# Movimenti per elemento
 _MOVIMENTI_EN: dict[str, str] = {
-    "Metallo":    "confident steady gait, precise controlled movements",
-    "Legno":      "vigorous but reserved movements, quiet deliberate gestures",
-    "Terra":      "slow heavy posture, solid stable stance",
-    "Fuoco":      "impulsive rapid movements, dynamic restless energy",
-    "Acqua":      "slow fluid movements, closed introverted posture",
+    "Metallo": "confident posture, controlled precise movements",
+    "Legno":   "reserved quiet stance, deliberate gestures",
+    "Terra":   "heavy stable posture, slow movements",
+    "Fuoco":   "dynamic energetic stance, restless body language",
+    "Acqua":   "slow fluid movements, slightly closed introverted posture",
 }
 
-# Zona del volto attiva per età
 _ZONA_EN: dict[str, str] = {
-    "Orecchie":  "ears clearly defined",
-    "Fronte":    "prominent forehead",
-    "Occhi":     "expressive eyes as focal point",
-    "Naso":      "strong prominent nose as focal point",
-    "Bocca":     "defined mouth and chin",
-    "Mascella":  "strong jaw and chin",
+    "Orecchie": "well-defined ears",
+    "Fronte":   "prominent forehead",
+    "Occhi":    "striking expressive eyes",
+    "Naso":     "strong prominent nose",
+    "Bocca":    "defined full lips and chin",
+    "Mascella": "strong defined jawline",
 }
 
-# Stile pittorico base
+# Didascalie brevi in italiano per ogni tipo
+DIDASCALIE: dict[str, str] = {
+    "frontale": "Ritratto frontale",
+    "laterale": "Profilo laterale",
+    "corpo":    "Figura intera",
+}
+
+# Stile base fotorealistico
 _STILE = (
-    "Traditional Chinese ink wash painting (水墨畫), "
-    "charcoal brush strokes on textured rice paper, "
-    "soft ink washes, white rice-paper background, "
-    "no text, no watermark, high detail"
+    "Photorealistic portrait photography, studio lighting, "
+    "neutral background, sharp focus, 8k resolution, "
+    "cinematic, no text, no watermark"
 )
 
-
-def _pulisci(testo: str) -> str:
-    """Rimuove riferimenti bibliografici tipo [2, 4] e testo extra."""
-    return re.sub(r"\s*\[\d+(?:,\s*\d+)*\]", "", testo).strip()
+def _eta_desc(eta: int) -> str:
+    if eta <= 20:   return "young adult, around 20 years old"
+    elif eta <= 35: return "adult, around 30 years old"
+    elif eta <= 55: return "middle-aged, around 45 years old"
+    else:           return "elderly, around 65 years old"
 
 
 def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
-    """
-    Costruisce il prompt FLUX usando i dati reali della scheda Ma Yi.
-
-    Parametri
-    ---------
-    risultato : dict  — output di mayi_engine.analizza_descrizione()
-    tipo      : str   — "frontale" | "laterale" | "corpo"
-    """
     if "errore" in risultato:
-        return f"{_STILE}. A serene scholar figure, five elements theme."
+        return f"{_STILE}. Portrait of a person."
 
-    elemento = risultato.get("elemento", "Terra")
-    eta      = risultato.get("eta", 45)
-    zona_ita = risultato.get("zona_eta", "")
+    elemento   = risultato.get("elemento", "Terra")
+    eta        = risultato.get("eta", 45)
+    zona_ita   = risultato.get("zona_eta", "")
 
-    # Usa i dizionari tradotti — valori precisi e puliti per FLUX
-    corpo      = _CORPO_EN.get(elemento, _pulisci(risultato.get("corpo", "")))
-    volto      = _VOLTO_EN.get(elemento, _pulisci(risultato.get("volto", "")))
-    carnagione = _CARNAGIONE_EN.get(elemento, _pulisci(risultato.get("complexion", "")))
-    movimenti  = _MOVIMENTI_EN.get(elemento, _pulisci(risultato.get("movimenti", "")))
+    corpo      = _CORPO_EN.get(elemento, "")
+    volto      = _VOLTO_EN.get(elemento, "")
+    carnagione = _CARNAGIONE_EN.get(elemento, "")
+    movimenti  = _MOVIMENTI_EN.get(elemento, "")
     zona_en    = _ZONA_EN.get(zona_ita, "")
-
-    # Età come fascia descrittiva
-    if eta <= 20:
-        eta_desc = "young adult, approximately 20 years old"
-    elif eta <= 35:
-        eta_desc = "adult, approximately 30 years old"
-    elif eta <= 55:
-        eta_desc = "middle-aged, approximately 45 years old"
-    else:
-        eta_desc = "elderly, approximately 65 years old"
+    eta_en     = _eta_desc(eta)
 
     if tipo == "frontale":
         return (
             f"{_STILE}. "
-            f"Frontal portrait. {eta_desc}. "
-            f"Face: {volto}. "
+            f"Frontal face portrait, {eta_en}. "
+            f"Facial features: {volto}. "
             f"{carnagione}. "
-            f"{zona_en}. "
-            f"Ancient Chinese historical figure, scholar aesthetic."
+            f"Facial focal point: {zona_en}."
         )
     elif tipo == "laterale":
         return (
             f"{_STILE}. "
-            f"Side profile portrait, head and shoulders only. {eta_desc}. "
-            f"Profile of face: {volto}. "
-            f"{carnagione}. "
-            f"Ancient Chinese historical figure, elegant brushwork."
+            f"Side profile portrait, head and shoulders, {eta_en}. "
+            f"Facial features in profile: {volto}. "
+            f"{carnagione}."
         )
     else:  # corpo
         return (
             f"{_STILE}. "
-            f"Full body standing portrait, complete figure head to toe. {eta_desc}. "
+            f"Full body portrait, {eta_en}. "
             f"Body build: {corpo}. "
-            f"Posture and movement: {movimenti}. "
-            f"Ancient Chinese historical figure, traditional robes."
+            f"Posture: {movimenti}."
         )
+
+
+def genera_didascalia(risultato: dict, tipo: str) -> str:
+    """Didascalia breve in italiano da mostrare sotto l'immagine."""
+    elemento = risultato.get("elemento", "")
+    eta      = risultato.get("eta", "")
+    zona     = risultato.get("zona_eta", "")
+
+    base = DIDASCALIE.get(tipo, tipo.capitalize())
+
+    if tipo == "frontale":
+        return f"{base} — {elemento}, {eta} anni. Zona: {zona}."
+    elif tipo == "laterale":
+        return f"{base} — profilo {elemento}."
+    else:
+        return f"{base} — corporatura {elemento}, {eta} anni."
 
 
 # ── API call ──────────────────────────────────────────────────────────────────
 
 def query_image_model(prompt: str) -> bytes | None:
-    """
-    Invia il prompt a FLUX.1-schnell via HuggingFace Router.
-    Legge HF_TOKEN dai Secrets di Streamlit.
-    """
     api_token = st.secrets.get("HF_TOKEN")
     if not api_token:
         st.error("🔑 HF_TOKEN non trovato nei Secrets di Streamlit.")
