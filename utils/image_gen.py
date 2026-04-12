@@ -3,15 +3,13 @@ import requests
 import time
 import io
 
-# Recupera il token dai secrets
 API_TOKEN = st.secrets.get("HF_TOKEN")
-
-# ENDPOINT FLUX (Supportato dal Router nel 2026)
+# Endpoint FLUX
 API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell"
 
 def query_image_model(prompt):
     if not API_TOKEN:
-        st.error("HF_TOKEN non trovato nei Secrets.")
+        st.error("Token HF_TOKEN non trovato.")
         return None
 
     headers = {
@@ -19,21 +17,21 @@ def query_image_model(prompt):
         "Content-Type": "application/json"
     }
     
-    # FLUX non supporta il negative_prompt nell'API Router semplice
+    # FLUX su Router vuole solo gli inputs. 
+    # Rimuoviamo 'parameters' per evitare conflitti di versione.
     payload = {
-        "inputs": prompt,
-        "parameters": {
-            "wait_for_model": True
-        }
+        "inputs": prompt
     }
     
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
         
-        # Gestione caricamento (Cold Start)
+        # Se il modello è in caricamento, il router restituirà un 503 o un tempo di attesa.
+        # Gestiamo il retry manualmente dato che non possiamo usare wait_for_model.
         if response.status_code == 503:
-            time.sleep(25)
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
+            with st.spinner("FLUX si sta scaldando... attendi 20 secondi."):
+                time.sleep(20)
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
 
         if response.status_code == 200:
             return response.content
@@ -42,21 +40,5 @@ def query_image_model(prompt):
             return None
             
     except Exception as e:
-        st.error(f"Errore di connessione: {e}")
+        st.error(f"Errore connessione: {e}")
         return None
-
-def genera_prompt_visuale(risultato, tipo="frontale"):
-    v = risultato.get('volto', 'human face')
-    c = risultato.get('complexion', 'skin')
-    b = risultato.get('corpo', 'body')
-    m = risultato.get('movimenti', 'posture')
-    
-    # Stile: pittura a inchiostro cinese
-    stile = "Traditional Chinese ink wash painting, charcoal brush strokes on textured rice paper, ancient aesthetic."
-    
-    if tipo == "frontale":
-        return f"{stile} Frontal portrait of a person, {v}, {c} complexion. Historical look."
-    elif tipo == "laterale":
-        return f"{stile} Side profile view of a head, focus on {v} structure."
-    else:
-        return f"{stile} Full body standing portrait, {b}, characteristic posture: {m}."
