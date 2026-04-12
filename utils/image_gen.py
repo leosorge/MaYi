@@ -1,3 +1,6 @@
+'''
+VERSIONE CON GENERAZIONE IMMAGINI CON SCHNELL
+
 import streamlit as st
 import requests
 import io
@@ -60,7 +63,6 @@ def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
     return f"{base_style} Portrait of a person, {elemento} element."
     
 '''
-Versione precedente 
 
 # Generatore d'immagini 
 # Usa stable diffusion base
@@ -76,7 +78,8 @@ API_TOKEN = st.secrets["HF_TOKEN"]
 
 # Modello consigliato per uno stile artistico coerente con la tradizione cinese
 # Puoi cambiare questo URL con altri modelli (es. FLUX.1 o SD-XL)
-API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+# Modello ad altissima stabilità per API gratuite
+API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
 
 def query_image_model(prompt: str) -> bytes:
     """
