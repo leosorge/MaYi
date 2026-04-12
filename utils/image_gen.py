@@ -1,3 +1,67 @@
+import streamlit as st
+import requests
+import io
+
+# Recupera il token dai secrets di Streamlit
+API_TOKEN = st.secrets["HF_TOKEN"]
+
+# Utilizziamo FLUX.1-schnell, un modello moderno e attivo
+API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+
+def query_image_model(prompt: str) -> bytes:
+    """
+    Invia il prompt all'Inference API di Hugging Face.
+    FLUX non richiede il negative_prompt nell'API di base.
+    """
+    headers = {"Authorization": f"Bearer {API_TOKEN}"}
+    payload = {
+        "inputs": prompt,
+    }
+    
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        
+        # Gestione errore 503 (Modello in caricamento)
+        if response.status_code == 503:
+            st.warning("Il modello si sta caricando su Hugging Face. Riprova tra 30 secondi.")
+            return None
+            
+        response.raise_for_status()
+        return response.content
+    except Exception as e:
+        st.error(f"Errore durante la generazione dell'immagine: {e}")
+        return None
+
+def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
+    """
+    Costruisce un prompt in inglese basato sui dati Ma Yi.
+    """
+    elemento = risultato.get('elemento', 'Metallo')
+    corpo = risultato.get('corpo', '')
+    volto = risultato.get('volto', '')
+    complexion = risultato.get('complexion', '')
+    movimenti = risultato.get('movimenti', '')
+
+    # Stile artistico: Pittura tradizionale cinese a inchiostro
+    base_style = (
+        "Ancient Chinese ink wash painting style, traditional aesthetic, "
+        "charcoal lines on aged rice paper, minimalist, subtle earth tones."
+    )
+    
+    traits = f"A person with {volto}, skin complexion: {complexion}."
+    
+    if tipo == "frontale":
+        return f"{base_style} Frontal portrait, close-up. {traits} Calm expression."
+    elif tipo == "laterale":
+        return f"{base_style} Side profile view. Focus on the nose and jawline. {traits}"
+    elif tipo == "corpo":
+        return f"{base_style} Full body standing. {corpo}. Posture: {movimenti}. Traditional Hanfu clothes."
+    
+    return f"{base_style} Portrait of a person, {elemento} element."
+    
+'''
+Versione precedente 
+
 # Generatore d'immagini 
 # Usa stable diffusion base
 # attraverso API huggingface
@@ -77,3 +141,4 @@ def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
         )
     
     return f"{base_style} Portrait of a person, {elemento} element."
+'''
