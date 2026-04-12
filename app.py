@@ -290,58 +290,6 @@ def _bar(pct: int, colore: str) -> str:
         f'</div>'
     )
 
-''' CODICE CLAUDE SOSTITUITO DA GEMINI 
-def render_card(label: str, r: dict, key_suffix: str = ""):
-    """Mostra la card di un risultato Ma Yi."""
-    if "errore" in r:
-        st.error(f"**{label}** — {r['errore']}")
-        return
-
-    st.markdown(f'<div class="card">', unsafe_allow_html=True)
-
-    col_em, col_info = st.columns([1, 4])
-    with col_em:
-        st.markdown(f'<div class="card-emoji">{r["emoji"]}</div>', unsafe_allow_html=True)
-
-    with col_info:
-        st.markdown(
-            f'<div class="card-elemento">{r["elemento"]}</div>'
-            f'<div style="font-size:.85rem;color:rgba(44,24,16,.5)">'
-            f'{label} &nbsp;·&nbsp; {r["eta"]} anni'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("---")
-
-    # Caratteristiche fisiche
-    col_a, col_b = st.columns(2)
-    with col_a:
-        for campo, titolo in [("corpo", "Corpo"), ("volto", "Volto"), ("complexion", "Carnagione")]:
-            st.markdown(
-                f'<div class="field-label">{titolo}</div>'
-                f'<div class="field-value">{r[campo]}</div>',
-                unsafe_allow_html=True,
-            )
-    with col_b:
-        for campo, titolo in [("voce", "Voce"), ("movimenti", "Postura e movimenti")]:
-            st.markdown(
-                f'<div class="field-label">{titolo}</div>'
-                f'<div class="field-value">{r[campo]}</div>',
-                unsafe_allow_html=True,
-            )
-        st.markdown(
-            f'<div class="field-label">Zona attiva (età {r["eta"]})</div>'
-            f'<div class="field-value" style="color:var(--red);font-weight:600">'
-            f'{r["zona_eta"]}</div>'
-            f'<div style="font-size:.8rem;color:rgba(44,24,16,.5);margin-top:.15rem">'
-            f'{r["nota_eta"]}</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("---")
-    '''
-
 # CODICE AGGIUNTO DA GEMINI PER LE FUNZIONI IMMAGINI
 
 def render_card(label: str, r: dict, key_suffix: str = ""):
