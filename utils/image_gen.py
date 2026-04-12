@@ -2,9 +2,12 @@
 utils/image_gen.py
 ─────────────────────────────────────────────────────────────────────────────
 Generazione immagini via HuggingFace Router → FLUX.1-schnell.
+
 Funzioni esportate:
-  - genera_prompt_visuale(risultato)  : costruisce il prompt da un profilo Ma Yi
-  - query_image_model(prompt)         : chiama l'API e ritorna i byte dell'immagine
+  - genera_prompt_visuale(risultato, tipo)  costruisce il prompt per uno dei
+                                            tre tipi: "frontale", "laterale",
+                                            "corpo"
+  - query_image_model(prompt)               chiama l'API, ritorna i byte PNG
 ─────────────────────────────────────────────────────────────────────────────
 """
 
@@ -21,71 +24,58 @@ API_URL = (
     "black-forest-labs/FLUX.1-schnell"
 )
 
+# ── Stile base comune a tutti i prompt ───────────────────────────────────────
+
+_STILE = (
+    "Traditional Chinese ink wash painting, charcoal brush strokes "
+    "on textured rice paper, ancient aesthetic, no text, no watermark."
+)
+
 # ── Prompt builder ────────────────────────────────────────────────────────────
 
-# Palette cromatica per elemento (per arricchire il prompt visivo)
-_PALETTE: dict[str, str] = {
-    "Metallo": "silver and white tones, sharp clean lines, metallic sheen",
-    "Legno":   "deep forest green and pale wood tones, slender tall figure",
-    "Terra":   "warm ochre and terracotta, stocky solid build, earthy warmth",
-    "Fuoco":   "deep crimson and amber, dynamic energetic pose, warm bronze skin",
-    "Acqua":   "deep navy and ink-black, rounded soft silhouette, still water",
-}
-
-_VOLTO_EN: dict[str, str] = {
-    "Metallo": "square jaw, deep-set eyes, straight nose",
-    "Legno":   "long oval face, prominent forehead, thick lips",
-    "Terra":   "large round face, wide mouth, broad nose",
-    "Fuoco":   "diamond-shaped face, bushy eyebrows, exposed nostrils",
-    "Acqua":   "round face, large eyes, thick arched eyebrows",
-}
-
-_CORPO_EN: dict[str, str] = {
-    "Metallo": "slender upright posture, medium height, large-boned with lean limbs",
-    "Legno":   "slim figure with long slender fingers",
-    "Terra":   "stocky and stout, short neck, short fingers",
-    "Fuoco":   "small upper body, wider lower body, small bony hands and feet",
-    "Acqua":   "round and full figure, prominent belly, narrow shoulders",
-}
-
-
-def genera_prompt_visuale(risultato: dict) -> str:
+def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
     """
-    Costruisce un prompt testuale per FLUX a partire dal dizionario
-    restituito da analizza_descrizione().
+    Costruisce il prompt FLUX per uno dei tre tipi di immagine.
 
-    Parameters
-    ----------
+    Parametri
+    ---------
     risultato : dict
         Output di mayi_engine.analizza_descrizione()
+    tipo : "frontale" | "laterale" | "corpo"
 
-    Returns
+    Ritorna
     -------
     str — prompt in inglese ottimizzato per FLUX.1-schnell
     """
     if "errore" in risultato:
-        return "A serene Chinese ink painting, five elements, traditional art style."
+        return f"{_STILE} A serene five-elements figure, classical Chinese art."
 
-    elemento = risultato.get("elemento", "Terra")
-    eta      = risultato.get("eta", 45)
-    zona     = risultato.get("zona_eta", "")
+    v = risultato.get("volto",     "human face")
+    c = risultato.get("complexion","natural skin")
+    b = risultato.get("corpo",     "human body")
+    m = risultato.get("movimenti", "standing posture")
 
-    palette = _PALETTE.get(elemento, "neutral tones")
-    volto   = _VOLTO_EN.get(elemento, "")
-    corpo   = _CORPO_EN.get(elemento, "")
-
-    prompt = (
-        f"Traditional Chinese ink painting portrait, Ma Yi physiognomy, "
-        f"{elemento} element type. "
-        f"Subject: approximately {eta} years old, {corpo}. "
-        f"Face: {volto}. "
-        f"Color palette: {palette}. "
-        f"Active facial zone: {zona}. "
-        f"Style: classical Chinese brush painting (水墨畫), soft ink washes, "
-        f"white rice-paper background, elegant calligraphic brushstrokes, "
-        f"no text, no watermark, high detail."
-    )
-    return prompt
+    if tipo == "frontale":
+        return (
+            f"{_STILE} "
+            f"Frontal portrait of a person. Face features: {v}. "
+            f"Complexion: {c}. Historical look, soft ink washes, "
+            f"white rice-paper background, high detail."
+        )
+    elif tipo == "laterale":
+        return (
+            f"{_STILE} "
+            f"Side profile view of a head and shoulders. "
+            f"Face structure: {v}. "
+            f"Elegant calligraphic brushstrokes, rice-paper background."
+        )
+    else:  # "corpo"
+        return (
+            f"{_STILE} "
+            f"Full body standing portrait. Body: {b}. "
+            f"Characteristic posture: {m}. "
+            f"Complete figure from head to toe, classical ink wash style."
+        )
 
 
 # ── API call ──────────────────────────────────────────────────────────────────
@@ -95,43 +85,40 @@ def query_image_model(prompt: str) -> bytes | None:
     Invia il prompt a FLUX.1-schnell via HuggingFace Router.
     Legge HF_TOKEN dai secrets di Streamlit.
 
-    Returns
-    -------
-    bytes  — contenuto PNG/JPEG dell'immagine, oppure None in caso di errore.
+    Ritorna i byte PNG dell'immagine, oppure None in caso di errore.
     """
     api_token = st.secrets.get("HF_TOKEN")
     if not api_token:
-        st.error("🔑 Token HF_TOKEN non trovato. Aggiungilo in Streamlit Secrets.")
+        st.error("🔑 HF_TOKEN non trovato nei Secrets di Streamlit.")
         return None
 
     headers = {
         "Authorization": f"Bearer {api_token}",
         "Content-Type": "application/json",
     }
-    payload = {"inputs": prompt}
+    payload = {
+        "inputs": prompt,
+        "parameters": {"wait_for_model": True},
+    }
 
     try:
-        response = requests.post(
-            API_URL, headers=headers, json=payload, timeout=120
-        )
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
 
-        # Modello in cold start → retry dopo 20 s
+        # Cold start → retry dopo 25 s
         if response.status_code == 503:
-            with st.spinner("FLUX si sta avviando… attendi 20 secondi."):
-                time.sleep(20)
-            response = requests.post(
-                API_URL, headers=headers, json=payload, timeout=120
-            )
+            with st.spinner("FLUX si sta avviando… attendi 25 secondi."):
+                time.sleep(25)
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
 
         if response.status_code == 200:
             return response.content
 
-        st.error(f"Errore API ({response.status_code}): {response.text[:300]}")
+        st.error(f"Errore Router ({response.status_code}): {response.text[:300]}")
         return None
 
     except requests.exceptions.Timeout:
-        st.error("Timeout: FLUX non ha risposto entro 120 s. Riprova.")
+        st.error("Timeout: FLUX non ha risposto entro 90 s. Riprova.")
         return None
     except Exception as exc:
-        st.error(f"Errore connessione: {exc}")
+        st.error(f"Errore di connessione: {exc}")
         return None
