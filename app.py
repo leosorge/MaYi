@@ -12,6 +12,22 @@ import sys
 import os
 
 import streamlit as st
+import spacy
+import subprocess
+
+# Funzione per caricare il modello spaCy in modo sicuro
+@st.cache_resource
+def load_spacy_model():
+    model_name = "it_core_news_md"
+    try:
+        return spacy.load(model_name)
+    except OSError:
+        # Se il modello non c'è, lo scarichiamo al volo
+        subprocess.run(["python", "-m", "spacy", "download", model_name])
+        return spacy.load(model_name)
+
+# Carica il modello (sostituisci dove facevi nlp = spacy.load...)
+nlp = load_spacy_model()
 
 # AGGIUNTA DA GEMINI PER LE IMMAGINI 1/2
 # Aggiungi questo insieme agli altri import in cima ad app.py
