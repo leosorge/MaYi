@@ -144,4 +144,3 @@ def genera_prompt_visuale(risultato: dict, tipo: str = "frontale") -> str:
         )
     
     return f"{base_style} Portrait of a person, {elemento} element."
-'''
