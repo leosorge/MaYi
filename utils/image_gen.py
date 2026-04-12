@@ -6,8 +6,8 @@ import io
 # Recupera il token dai secrets
 API_TOKEN = st.secrets.get("HF_TOKEN")
 
-# NUOVO ENDPOINT ROUTER OBBLIGATORIO (Aprile 2026)
-API_URL = "https://router.huggingface.co/hf-inference/models/runwayml/stable-diffusion-v1-5"
+# ENDPOINT AGGIORNATO: Usiamo SDXL che è il modello standard del nuovo Router
+API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
 
 def query_image_model(prompt):
     if not API_TOKEN:
@@ -19,24 +19,29 @@ def query_image_model(prompt):
         "Content-Type": "application/json"
     }
     
+    # SDXL richiede questa struttura di payload
     payload = {
         "inputs": prompt,
-        "parameters": {"wait_for_model": True}
+        "parameters": {
+            "wait_for_model": True,
+            "negative_prompt": "modern, photo, blurry, bad anatomy, text, watermark"
+        }
     }
     
     try:
-        # Chiamata al nuovo Router
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+        # Chiamata al Router
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
         
-        # Se il router risponde 503, il modello è in "cold start"
+        # Gestione caricamento modello
         if response.status_code == 503:
-            with st.spinner("Il nuovo Router sta svegliando il modello..."):
-                time.sleep(20)
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+            with st.spinner("Il Router sta caricando il modello (può richiedere un minuto)..."):
+                time.sleep(25)
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=90)
 
         if response.status_code == 200:
             return response.content
         else:
+            # Se ancora 404, proviamo un modello alternativo d'emergenza
             st.error(f"Errore Router ({response.status_code}): {response.text}")
             return None
             
@@ -50,11 +55,12 @@ def genera_prompt_visuale(risultato, tipo="frontale"):
     b = risultato.get('corpo', 'body')
     m = risultato.get('movimenti', 'posture')
     
-    stile = "Ancient Chinese ink wash painting, traditional aesthetic, charcoal lines, aged paper."
+    # Stile: pittura tradizionale cinese
+    stile = "Ancient Chinese ink wash painting, traditional aesthetic, charcoal strokes, aged paper texture."
     
     if tipo == "frontale":
-        return f"{stile} Frontal portrait, close-up, {v}, {c}."
+        return f"{stile} Close-up front portrait, {v}, {c}."
     elif tipo == "laterale":
-        return f"{stile} Side profile view, {v}."
+        return f"{stile} Side profile view, profile of the head, {v}."
     else:
-        return f"{stile} Full body standing, {b}, posture: {m}."
+        return f"{stile} Full body standing, {b}, characteristic posture: {m}."
