@@ -390,26 +390,50 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Immagine FLUX (opzionale) ─────────────────────────────────────────────
+    # ── Tre immagini FLUX (opzionale) ────────────────────────────────────────
     if genera_immagini:
         st.markdown("---")
-        if st.button("🖼️ Genera ritratto pittorico", key=f"img_{key_suffix}"):
-            prompt = genera_prompt_visuale(r)
-            with st.spinner("FLUX sta dipingendo il ritratto…"):
-                img_bytes = query_image_model(prompt)
-            if img_bytes:
-                st.image(img_bytes, use_container_width=True)
-                st.markdown(
-                    f'<div class="img-prompt">Prompt: {prompt}</div>',
-                    unsafe_allow_html=True,
-                )
-                st.download_button(
-                    label="⬇ Scarica immagine",
-                    data=img_bytes,
-                    file_name=label.replace(" ", "_").lower()[:40] + "-mayi.png",
-                    mime="image/png",
-                    key=f"dl_img_{key_suffix}",
-                )
+        st.markdown(
+            '<div class="field-label">Generazione ritratti pittorici (FLUX)</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("🖼️ Genera le 3 immagini", key=f"img_{key_suffix}"):
+            tipi   = ["frontale", "laterale", "corpo"]
+            labels = ["Ritratto frontale", "Profilo laterale", "Figura intera"]
+            imgs   = {}
+
+            # Genera le tre immagini in sequenza con spinner dedicato
+            for tipo, titolo in zip(tipi, labels):
+                prompt = genera_prompt_visuale(r, tipo=tipo)
+                with st.spinner(f"FLUX: {titolo}…"):
+                    img_bytes = query_image_model(prompt)
+                imgs[tipo] = (titolo, prompt, img_bytes)
+
+            # Mostra le tre immagini affiancate
+            col_f, col_l, col_c = st.columns(3)
+            for col, tipo in zip([col_f, col_l, col_c], tipi):
+                titolo, prompt, img_bytes = imgs[tipo]
+                with col:
+                    st.markdown(
+                        f'<div class="field-label">{titolo}</div>',
+                        unsafe_allow_html=True,
+                    )
+                    if img_bytes:
+                        st.image(img_bytes, use_container_width=True)
+                        st.markdown(
+                            f'<div class="img-prompt">{prompt}</div>',
+                            unsafe_allow_html=True,
+                        )
+                        nome_base = label.replace(" ", "_").lower()[:30]
+                        st.download_button(
+                            label=f"⬇ Scarica {titolo.lower()}",
+                            data=img_bytes,
+                            file_name=f"{nome_base}-{tipo}.png",
+                            mime="image/png",
+                            key=f"dl_img_{key_suffix}_{tipo}",
+                        )
+                    else:
+                        st.warning(f"{titolo}: generazione fallita.")
 
     # Download .txt
     st.download_button(
