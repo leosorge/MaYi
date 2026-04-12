@@ -1,4 +1,5 @@
 streamlit
-spacy
+spacy>=3.7.0
 requests
 Pillow
+it_core_news_md @ https://github.com/explosion/spacy-models/releases/download/it_core_news_md-3.7.0/it_core_news_md-3.7.0-py3-none-any.whl
