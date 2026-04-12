@@ -1,56 +1,48 @@
 import streamlit as st
-import requests
-import time
+import io
+from huggingface_hub import InferenceClient
 
 # Recupera il token dai secrets
 API_TOKEN = st.secrets.get("HF_TOKEN")
 
-# Usiamo l'endpoint di SD 2.1, solitamente più stabile del 1.5 su HF
-API_URL = "https://router.huggingface.co/models/stabilityai/stable-diffusion-2-1"
+# Inizializziamo il client ufficiale
+# Usiamo un modello molto comune e stabile: Stable Diffusion v1.5 o XL
+client = InferenceClient(token=API_TOKEN)
 
 def query_image_model(prompt):
     if not API_TOKEN:
-        st.error("HF_TOKEN non trovato nei Secrets!")
+        st.error("HF_TOKEN mancante nei Secrets.")
         return None
 
-    headers = {"Authorization": f"Bearer {API_TOKEN}"}
-    payload = {
-        "inputs": prompt,
-        "parameters": {"wait_for_model": True}
-    }
-    
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+        # Il client ufficiale gestisce automaticamente il routing corretto
+        image = client.text_to_image(
+            prompt,
+            model="runwayml/stable-diffusion-v1-5", # Modello con massima disponibilità
+            negative_prompt="modern, low quality, blurry, 3d render",
+        )
         
-        # Se il modello è in caricamento (503), aspettiamo una volta sola
-        if response.status_code == 503:
-            with st.spinner("Il modello si sta svegliando... attendi 15 secondi"):
-                time.sleep(15)
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+        # Convertiamo l'oggetto PIL Image in bytes per Streamlit
+        img_byte_arr = io.BytesIO()
+        image.save(img_byte_arr, format='PNG')
+        return img_byte_arr.getvalue()
 
-        if response.status_code == 200:
-            return response.content
-        else:
-            st.error(f"Errore API ({response.status_code}): {response.text}")
-            return None
-            
     except Exception as e:
-        st.error(f"Errore di connessione: {e}")
+        st.error(f"Errore durante la generazione: {e}")
         return None
 
 def genera_prompt_visuale(risultato, tipo="frontale"):
-    """Costruisce il prompt partendo dai dati Ma Yi dell'engine."""
+    """Costruisce il prompt basato sui dati Ma Yi."""
     v = risultato.get('volto', 'human face')
-    c = risultato.get('complexion', 'natural')
-    b = risultato.get('corpo', 'person')
-    m = risultato.get('movimenti', 'standing')
+    c = risultato.get('complexion', 'natural skin')
+    b = risultato.get('corpo', 'human body')
+    m = risultato.get('movimenti', 'posture')
     
-    # Stile: pittura a inchiostro per coerenza storica
-    stile = "Ancient Chinese ink wash painting, traditional aesthetic, charcoal lines on parchment."
+    stile = "Traditional Chinese ink painting, charcoal strokes, aged parchment aesthetic."
     
     if tipo == "frontale":
-        return f"{stile} Frontal portrait, close-up, {v}, {c} skin."
+        return f"{stile} Frontal portrait, close-up, {v}, {c}."
     elif tipo == "laterale":
         return f"{stile} Side profile view, profile of the head, {v}."
     else:
-        return f"{stile} Full body view, {b}, posture: {m}."
+        return f"{stile} Full body standing, {b}, posture: {m}."
