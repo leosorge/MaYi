@@ -9,6 +9,7 @@ import io
 import zipfile
 import sys
 import os
+import base64
 
 import streamlit as st
 
@@ -27,12 +28,28 @@ from data.ma_yi_data import MA_YI_DATA, ETA_FOCUS
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 
+# ── Favicon ─────────────────────────────────────────────────────────────────
+def _fav_b64() -> str:
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "favicon_mayi.png"), "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except FileNotFoundError:
+        return ""
+
 st.set_page_config(
     page_title="Ma Yi — Analisi Fisiognomica",
-    page_icon="☯",
+    page_icon="favicon_mayi.png",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# ── Inietta favicon via base64 (funziona su tutti i browser/cloud) ──────────
+_fav = _fav_b64()
+if _fav:
+    st.markdown(
+        f'<link rel="icon" type="image/png" href="data:image/png;base64,{_fav}">',
+        unsafe_allow_html=True,
+    )
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
