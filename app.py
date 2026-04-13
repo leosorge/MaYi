@@ -22,7 +22,7 @@ from utils.mayi_engine import (
     spacy_model_name,
     _load_spacy,
 )
-from utils.image_gen import genera_prompt_visuale, genera_didascalia, query_image_model
+from utils.image_gen import genera_prompt_visuale, genera_didascalia, query_image_model, rileva_sesso
 from data.ma_yi_data import MA_YI_DATA, ETA_FOCUS
 
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
@@ -89,8 +89,8 @@ html, body, [data-testid="stApp"] {
     text-shadow: 2px 2px 0 rgba(139,26,26,.15);
 }
 .hero-subtitle {
-    font-size: .82rem;
-    letter-spacing: .25em;
+    font-size: .88rem;
+    letter-spacing: .08em;
     text-transform: uppercase;
     color: rgba(44,24,16,.45);
     margin-top: .5rem;
@@ -152,8 +152,8 @@ html, body, [data-testid="stApp"] {
 .card-emoji { font-size: 2.4rem; line-height: 1; }
 
 .field-label {
-    font-size: .68rem;
-    letter-spacing: .18em;
+    font-size: .82rem;
+    letter-spacing: .04em;
     text-transform: uppercase;
     color: rgba(44,24,16,.4);
     margin: .9rem 0 .2rem;
@@ -180,8 +180,8 @@ html, body, [data-testid="stApp"] {
 .eta-table th {
     text-align: left;
     font-weight: 400;
-    letter-spacing: .1em;
-    font-size: .68rem;
+    letter-spacing: .02em;
+    font-size: .82rem;
     text-transform: uppercase;
     color: rgba(44,24,16,.4);
     padding: .3rem .5rem;
@@ -192,8 +192,8 @@ html, body, [data-testid="stApp"] {
 
 .metodo-tag {
     display: inline-block;
-    font-size: .68rem;
-    letter-spacing: .1em;
+    font-size: .82rem;
+    letter-spacing: .02em;
     text-transform: uppercase;
     background: rgba(139,26,26,.07);
     border: 1px solid var(--border);
@@ -209,8 +209,8 @@ html, body, [data-testid="stApp"] {
     border-radius: 3px !important;
     color: var(--red) !important;
     font-family: 'Noto Serif SC', serif !important;
-    font-size: .78rem !important;
-    letter-spacing: .08em !important;
+    font-size: .88rem !important;
+    letter-spacing: .02em !important;
 }
 [data-testid="stDownloadButton"] button:hover {
     background: rgba(139,26,26,.06) !important;
@@ -221,19 +221,20 @@ html, body, [data-testid="stApp"] {
     border: 1px solid rgba(184,150,12,.25);
     border-radius: 4px;
     padding: .9rem 1.1rem;
-    font-size: .84rem;
+    font-size: .95rem;
     line-height: 1.7;
     color: rgba(44,24,16,.7);
     margin-bottom: 1rem;
 }
 
 .img-prompt {
-    font-size: .92rem;
-    font-weight: 500;
-    color: rgba(44,24,16,.7);
+    font-size: 1rem;
+    font-weight: 600;
+    color: rgba(44,24,16,.85);
     margin-top: .5rem;
     margin-bottom: .3rem;
     line-height: 1.4;
+    letter-spacing: 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -300,7 +301,7 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
     with col_info:
         st.markdown(
             f'<div class="card-elemento">{r["elemento"]}</div>'
-            f'<div style="font-size:.85rem;color:rgba(44,24,16,.5)">'
+            f'<div style="font-size:.95rem;color:rgba(44,24,16,.5)">'
             f'{label} &nbsp;·&nbsp; {r["eta"]} anni</div>',
             unsafe_allow_html=True,
         )
@@ -326,7 +327,7 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
             f'<div class="field-label">Zona attiva (età {r["eta"]})</div>'
             f'<div class="field-value" style="color:var(--red);font-weight:600">'
             f'{r["zona_eta"]}</div>'
-            f'<div style="font-size:.8rem;color:rgba(44,24,16,.5);margin-top:.15rem">'
+            f'<div style="font-size:.88rem;color:rgba(44,24,16,.5);margin-top:.15rem">'
             f'{r["nota_eta"]}</div>',
             unsafe_allow_html=True,
         )
@@ -364,9 +365,9 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                 emoji  = MA_YI_DATA[elem]["emoji"]
                 st.markdown(
                     f'<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">'
-                    f'<span style="width:90px;font-size:.8rem">{emoji} {elem}</span>'
+                    f'<span style="width:90px;font-size:.9rem">{emoji} {elem}</span>'
                     f'<div style="flex:1">{_bar(pct, colore)}</div>'
-                    f'<span style="font-size:.7rem;color:rgba(44,24,16,.4);width:38px;text-align:right">{val}</span>'
+                    f'<span style="font-size:.82rem;color:rgba(44,24,16,.4);width:38px;text-align:right">{val}</span>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -395,17 +396,19 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
             if st.button("🖼️ Genera le 3 immagini", key=f"img_{key_suffix}"):
                 tipi        = ["frontale", "laterale", "corpo"]
                 labels_tipi = ["Ritratto frontale", "Profilo laterale", "Figura intera"]
+                sesso = rileva_sesso(label)
                 imgs_generati = {}
                 for tipo, titolo in zip(tipi, labels_tipi):
-                    prompt = genera_prompt_visuale(r, tipo=tipo)
+                    prompt = genera_prompt_visuale(r, tipo=tipo, sesso=sesso)
                     with st.spinner(f"FLUX: {titolo}…"):
                         img_bytes = query_image_model(prompt)
                     imgs_generati[tipo] = (titolo, prompt, img_bytes)
-                st.session_state[ss_key] = imgs_generati
+                st.session_state[ss_key] = {"imgs": imgs_generati, "sesso": sesso}
 
             if ss_key in st.session_state:
                 import base64
-                imgs_salvati = st.session_state[ss_key]
+                imgs_salvati  = st.session_state[ss_key]["imgs"]
+                sesso_salvato = st.session_state[ss_key]["sesso"]
                 nome_base    = label.replace(" ", "_").lower()[:30]
 
                 col_f, col_l, col_c = st.columns(3)
@@ -421,7 +424,7 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                             )
                             if img_bytes:
                                 st.image(img_bytes, width='stretch')
-                                didascalia = genera_didascalia(r, tipo)
+                                didascalia = genera_didascalia(r, tipo, sesso=sesso_salvato)
                                 st.markdown(
                                     f'<div class="img-prompt">{didascalia}</div>',
                                     unsafe_allow_html=True,
@@ -432,7 +435,7 @@ def render_card(label: str, r: dict, key_suffix: str = ""):
                                     f'<a href="data:image/png;base64,{b64}"'
                                     f' download="{fname}"'
                                     f' style="display:inline-block;margin-top:.4rem;'
-                                    f'font-size:.78rem;color:#8b1a1a;'
+                                    f'font-size:.9rem;color:#8b1a1a;'
                                     f'border:1px solid rgba(139,26,26,.35);'
                                     f'border-radius:3px;padding:.25rem .8rem;'
                                     f'text-decoration:none;">'
@@ -584,7 +587,7 @@ La riga <code>ETA: N</code> è opzionale; se assente usa l'età predefinita sott
 st.markdown("""
 <div style="text-align:center;margin-top:4rem;padding-top:1.5rem;
     border-top:1px solid rgba(139,26,26,.15);
-    font-size:.7rem;letter-spacing:.15em;
+    font-size:.82rem;letter-spacing:.04em;
     color:rgba(44,24,16,.25);text-transform:uppercase">
     Ma Yi 麻衣神相 · Cinque Elementi · spaCy + Streamlit · FLUX.1 · uso creativo / narrativo
 </div>
