@@ -206,9 +206,10 @@ def genera_prompt_visuale(risultato: dict, tipo: str = "frontale",
         seed = f" {seed_volto}." if seed_volto else ""
         return (
             f"{_STILE}. "
-            f"Full body portrait, {eta_en}.{seed} "
+            f"Full body shot, entire body visible from head to feet, feet and shoes visible at bottom of frame, {eta_en}.{seed} "
             f"Body build: {corpo}. "
-            f"Posture: {movimenti}."
+            f"Posture: {movimenti}. "
+            f"Full length, standing, whole figure in frame."
         )
 
 
