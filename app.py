@@ -553,15 +553,24 @@ with tab_singolo:
                 eta=int(eta_input),
                 use_spacy=use_spacy,
             )
+        # Salva in session_state: sopravvive ai rerender (click toggle, button, download)
+        st.session_state["singolo"] = {
+            "label":    label_input.strip(),
+            "r":        risultato,
+            "ambiente": ambiente_input.strip(),
+            "secolo":   secolo_input.strip(),
+        }
+
+    # Mostra card e immagini se presenti — sempre, non solo dentro il button
+    if "singolo" in st.session_state:
+        _s = st.session_state["singolo"]
         render_card(
-            label_input.strip(), risultato, key_suffix="singolo",
-            ambiente=ambiente_input.strip(),
-            secolo=secolo_input.strip(),
+            _s["label"], _s["r"], key_suffix="singolo",
+            ambiente=_s["ambiente"], secolo=_s["secolo"],
         )
         render_immagini(
-            label_input.strip(), risultato, key_suffix="singolo",
-            ambiente=ambiente_input.strip(),
-            secolo=secolo_input.strip(),
+            _s["label"], _s["r"], key_suffix="singolo",
+            ambiente=_s["ambiente"], secolo=_s["secolo"],
         )
 
 
@@ -599,12 +608,18 @@ La riga <code>ETA: N</code> è opzionale; se assente usa l'età predefinita sott
         if not schede:
             st.error("Nessuna scheda valida trovata nel file.")
         else:
-            st.success(f"{len(schede)} scheda/e elaborate.")
-            risultati: list[tuple[str, dict]] = []
+            # Calcola solo se non già in session_state o se il file è cambiato
+            file_id = hash(raw)
+            if st.session_state.get("multi_file_id") != file_id:
+                st.success(f"{len(schede)} scheda/e elaborate.")
+                with st.spinner("Analisi in corso…"):
+                    risultati = []
+                    for label, testo, eta, amb, sec in schede:
+                        risultati.append((label, analizza_descrizione(testo, eta=eta, use_spacy=use_spacy), amb, sec))
+                st.session_state["multi_risultati"] = risultati
+                st.session_state["multi_file_id"]   = file_id
 
-            with st.spinner("Analisi in corso…"):
-                for label, testo, eta, amb, sec in schede:
-                    risultati.append((label, analizza_descrizione(testo, eta=eta, use_spacy=use_spacy), amb, sec))
+            risultati = st.session_state.get("multi_risultati", [])
 
             for i, (label, r, amb, sec) in enumerate(risultati):
                 with st.expander(
@@ -613,7 +628,7 @@ La riga <code>ETA: N</code> è opzionale; se assente usa l'età predefinita sott
                     expanded=(i == 0),
                 ):
                     render_card(label, r, key_suffix=f"multi_{i}", ambiente=amb, secolo=sec)
-                    render_immagini(label, r, key_suffix=f"multi_{i}", ambiente=amb, secolo=sec)
+                render_immagini(label, r, key_suffix=f"multi_{i}", ambiente=amb, secolo=sec)
 
             st.markdown("---")
             st.markdown("#### ⬇ Scarica tutti i profili")
