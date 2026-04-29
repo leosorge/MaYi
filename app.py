@@ -432,22 +432,13 @@ def render_immagini(label: str, r: dict, key_suffix: str,
 
     ss_key = f"imgs_{key_suffix}"
 
-    col_btn, col_toggle = st.columns([2, 3])
-    with col_toggle:
-        attiva = st.toggle(
-            "Attiva generazione ritratti (FLUX)",
-            value=False,
-            key=f"toggle_img_{key_suffix}",
-        )
-    with col_btn:
-        genera = st.button(
-            "🖼️ Genera le 3 immagini",
-            key=f"img_{key_suffix}",
-            disabled=not attiva,
-            type="primary",
-        )
+    genera = st.button(
+        "🖼️ Genera le 3 immagini",
+        key=f"img_{key_suffix}",
+        type="primary",
+    )
 
-    if genera and attiva:
+    if genera:
         sesso    = rileva_sesso(label)
         elemento = r.get("elemento", "")
         barba    = sesso == "M" and elemento in ("Metallo", "Legno", "Terra")
